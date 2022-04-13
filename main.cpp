@@ -1,58 +1,61 @@
 #include <iostream>
+#include <stdlib.h>
+#include <ctime>
 #include <iomanip>
-#include <assert.h>
 
 #include "QBDI.h"
 
-QBDI::VMAction showInstruction(QBDI::VM *vm, QBDI::GPRState *gprState, QBDI::FPRState *fprState, void *data) {
-    const QBDI::InstAnalysis *instAnalysis = vm->getInstAnalysis(QBDI::AnalysisType::ANALYSIS_INSTRUCTION | QBDI::AnalysisType::ANALYSIS_DISASSEMBLY
-                                                                    | QBDI::AnalysisType::ANALYSIS_OPERANDS);
+uint8_t *source(int n) {
+    return (uint8_t *)malloc(n);
+}
 
-    std::cout << std::setbase(16) << instAnalysis->address << ":" 
-              << instAnalysis->disassembly << " : " << instAnalysis->mnemonic << std::endl << std::setbase(10);
+void sink(uint8_t *s, int n) {
+    free(s);
+}
+
+void func(int n) {
+    uint8_t *tstr = source(n);
+    uint8_t *str = (uint8_t *)malloc(n);
+    uint8_t *rd = (uint8_t *)malloc(n);
+
+    for (int i = 0; i < n; i++) {
+        if (rand() % 2) rd[i] = tstr[i]; else rd[i] = str[i];
+    }
+
+    sink(rd, n);
+
+    free(tstr);
+    free(str);
+}
+
+QBDI::VMAction showInstruction(QBDI::VM *vm, QBDI::GPRState *gprState, QBDI::FPRState *fprState, void *data) {
+    const QBDI::InstAnalysis *instAnalysis = vm->getInstAnalysis((QBDI::AnalysisType)7);
+
+    std::cout << std::setbase(16) << instAnalysis->address << ": "
+                << instAnalysis->disassembly << std::endl << std::setbase(10);
     
-    std::cout << gprState->rax << std::endl;
+    if (instAnalysis->isCall) {
+        std::cout << std::setbase(16) << instAnalysis->operands[0].value + instAnalysis->address << std::endl << std::setbase(10);
+    }
 
     return QBDI::VMAction::CONTINUE;
 }
 
-int sum(int a, int b) {
-    return a + b;
-}
-
-static const size_t STACK_SIZE = 0x100000;
+const static size_t STACK_SIZE = 0x100000;
 
 int main(int argc, char **argv) {
-    int a = atoi(argv[1]);
-    int b = atoi(argv[2]);
+    srand(time(0));
 
-    bool res;
-    uint32_t cid;
+    int n = atoi(argv[1]);
 
     uint8_t *fakestack;
     QBDI::GPRState *state;
-    QBDI::rword retvalue;
 
     QBDI::VM *vm = new QBDI::VM;
-
     state = vm->getGPRState();
-    assert(state != nullptr);
-
-    res = QBDI::allocateVirtualStack(state, STACK_SIZE, &fakestack);
-    assert(res);
-
-    cid = vm->addCodeCB(QBDI::POSTINST, showInstruction, nullptr);
-    assert(cid != QBDI::INVALID_EVENTID);
-
-    res = vm->addInstrumentedModuleFromAddr((QBDI::rword)sum);
-    assert(res);
-
-    std::cout << "Running function..." << std::endl;
-
-    res = vm->call(&retvalue, (QBDI::rword)sum, {(QBDI::rword)a, (QBDI::rword)b});
-    assert(res);
-
-    std::cout << "result = " << retvalue << std::endl;
-
+    QBDI::allocateVirtualStack(state, STACK_SIZE, &fakestack);
+    vm->addCodeCB(QBDI::PREINST, showInstruction, nullptr);
+    vm->addInstrumentedModuleFromAddr((QBDI::rword)func);
+    vm->call(nullptr, (QBDI::rword)func, {(QBDI::rword)n});
     QBDI::alignedFree(fakestack);
 }
