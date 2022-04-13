@@ -5,20 +5,19 @@
 #include "QBDI.h"
 
 QBDI::VMAction showInstruction(QBDI::VM *vm, QBDI::GPRState *gprState, QBDI::FPRState *fprState, void *data) {
-    const QBDI::InstAnalysis *instAnalysis = vm->getInstAnalysis();
+    const QBDI::InstAnalysis *instAnalysis = vm->getInstAnalysis(QBDI::AnalysisType::ANALYSIS_INSTRUCTION | QBDI::AnalysisType::ANALYSIS_DISASSEMBLY
+                                                                    | QBDI::AnalysisType::ANALYSIS_OPERANDS);
 
     std::cout << std::setbase(16) << instAnalysis->address << ":" 
-              << instAnalysis->disassembly << std::endl << std::setbase(10);
+              << instAnalysis->disassembly << " : " << instAnalysis->mnemonic << std::endl << std::setbase(10);
+    
+    std::cout << gprState->rax << std::endl;
 
     return QBDI::VMAction::CONTINUE;
 }
 
-int prod(int p, int x) {
-    return p * x;
-}
-
 int sum(int a, int b) {
-    return prod(3, a) + prod(5, b);
+    return a + b;
 }
 
 static const size_t STACK_SIZE = 0x100000;
@@ -42,7 +41,7 @@ int main(int argc, char **argv) {
     res = QBDI::allocateVirtualStack(state, STACK_SIZE, &fakestack);
     assert(res);
 
-    cid = vm->addCodeCB(QBDI::PREINST, showInstruction, nullptr);
+    cid = vm->addCodeCB(QBDI::POSTINST, showInstruction, nullptr);
     assert(cid != QBDI::INVALID_EVENTID);
 
     res = vm->addInstrumentedModuleFromAddr((QBDI::rword)sum);
