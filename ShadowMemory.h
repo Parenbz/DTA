@@ -2,6 +2,7 @@
 #define SHADOW_MEMORY_H
 
 #include <stdint.h>
+#include "QBDI.h"
 
 class ThirdMap {
 private:
@@ -11,9 +12,9 @@ public:
     ThirdMap();
     ~ThirdMap();
 
-    bool checkByte(uint64_t tm, uint64_t dtm);
-    void markByte(uint64_t tm, uint64_t dtm);
-    void freeByte(uint64_t tm, uint64_t dtm);
+    bool checkByte(QBDI::rword tm, QBDI::rword dtm);
+    void markByte(QBDI::rword tm, QBDI::rword dtm);
+    void freeByte(QBDI::rword tm, QBDI::rword dtm);
 };
 
 class SecondMap {
@@ -24,9 +25,9 @@ public:
     SecondMap();
     ~SecondMap();
 
-    bool checkByte(uint64_t sm, uint64_t tm, uint64_t dtm);
-    void markByte(uint64_t sm, uint64_t tm, uint64_t dtm);
-    void freeByte(uint64_t sm, uint64_t tm, uint64_t dtm);
+    bool checkByte(QBDI::rword sm, QBDI::rword tm, QBDI::rword dtm);
+    void markByte(QBDI::rword sm, QBDI::rword tm, QBDI::rword dtm);
+    void freeByte(QBDI::rword sm, QBDI::rword tm, QBDI::rword dtm);
 };
 
 class ShadowMemory {
@@ -37,13 +38,13 @@ public:
     ShadowMemory();
     ~ShadowMemory();
 
-    bool checkByte(uint64_t address);
-    bool checkByteRange(uint64_t address, uint32_t size);
-    void markByte(uint64_t address);
-    void markByteRange(uint64_t address, uint32_t size);
-    void freeByte(uint64_t address);
-    void freeByteRange(uint64_t address, uint32_t size);
-    
+    bool checkByte(QBDI::rword address);
+    bool checkByteRange(QBDI::rword address, QBDI::rword size);
+    void markByte(QBDI::rword address);
+    void markByteRange(QBDI::rword address, QBDI::rword size);
+    void freeByte(QBDI::rword address);
+    void freeByteRange(QBDI::rword address, QBDI::rword size);
+
 };
 
 #endif
