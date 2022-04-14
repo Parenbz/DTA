@@ -1,7 +1,5 @@
 #ifndef SHADOW_MEMORY_H
 #define SHADOW_MEMORY_H
-
-#include <stdint.h>
 #include "QBDI.h"
 
 class ThirdMap {
@@ -33,6 +31,7 @@ public:
 class ShadowMemory {
 private:
     SecondMap* PM[65536];
+    QBDI::GPRState regs;
 
 public:
     ShadowMemory();
@@ -40,11 +39,13 @@ public:
 
     bool checkByte(QBDI::rword address);
     bool checkByteRange(QBDI::rword address, QBDI::rword size);
+    bool checkRegister(int16_t regCtxIdx);
     void markByte(QBDI::rword address);
     void markByteRange(QBDI::rword address, QBDI::rword size);
+    void markRegister(int16_t regCtxIdx);
     void freeByte(QBDI::rword address);
     void freeByteRange(QBDI::rword address, QBDI::rword size);
-
+    void freeRegister(int16_t regCtxIdx);
 };
 
 #endif
