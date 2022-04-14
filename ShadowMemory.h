@@ -4,15 +4,15 @@
 
 class ThirdMap {
 private:
-    uint8_t TM[8192];
+    size_t TM[65536];
 
 public:
     ThirdMap();
     ~ThirdMap();
 
-    bool checkByte(QBDI::rword tm, QBDI::rword dtm);
-    void markByte(QBDI::rword tm, QBDI::rword dtm);
-    void freeByte(QBDI::rword tm, QBDI::rword dtm);
+    size_t checkByte(QBDI::rword tm);
+    void markByte(QBDI::rword tm, size_t mark);
+    void freeByte(QBDI::rword tm);
 };
 
 class SecondMap {
@@ -23,9 +23,9 @@ public:
     SecondMap();
     ~SecondMap();
 
-    bool checkByte(QBDI::rword sm, QBDI::rword tm, QBDI::rword dtm);
-    void markByte(QBDI::rword sm, QBDI::rword tm, QBDI::rword dtm);
-    void freeByte(QBDI::rword sm, QBDI::rword tm, QBDI::rword dtm);
+    size_t checkByte(QBDI::rword sm, QBDI::rword tm);
+    void markByte(QBDI::rword sm, QBDI::rword tm, size_t mark);
+    void freeByte(QBDI::rword sm, QBDI::rword tm);
 };
 
 class ShadowMemory {
@@ -37,12 +37,12 @@ public:
     ShadowMemory();
     ~ShadowMemory();
 
-    bool checkByte(QBDI::rword address);
-    bool checkByteRange(QBDI::rword address, QBDI::rword size);
-    bool checkRegister(int16_t regCtxIdx);
-    void markByte(QBDI::rword address);
-    void markByteRange(QBDI::rword address, QBDI::rword size);
-    void markRegister(int16_t regCtxIdx);
+    size_t checkByte(QBDI::rword address);
+    size_t checkByteRange(QBDI::rword address, QBDI::rword size);
+    size_t checkRegister(int16_t regCtxIdx);
+    void taintByte(QBDI::rword address, size_t color);
+    void taintByteRange(QBDI::rword address, QBDI::rword size, size_t color);
+    void taintRegister(int16_t regCtxIdx, size_t color);
     void freeByte(QBDI::rword address);
     void freeByteRange(QBDI::rword address, QBDI::rword size);
     void freeRegister(int16_t regCtxIdx);

@@ -10,16 +10,16 @@
 
     ThirdMap::~ThirdMap() {}
 
-    bool ThirdMap::checkByte(QBDI::rword tm, QBDI::rword dtm) {
-        return TM[tm] & (1 << (7 - dtm));
+    size_t ThirdMap::checkByte(QBDI::rword tm) {
+        return TM[tm];
     }
 
-    void ThirdMap::markByte(QBDI::rword tm, QBDI::rword dtm) {
-        TM[tm] |= 1 << (7 - dtm);
+    void ThirdMap::markByte(QBDI::rword tm, size_t mark) {
+        TM[tm] = mark;
     }
 
-    void ThirdMap::freeByte(QBDI::rword tm, QBDI::rword dtm) {
-        TM[tm] &= ~(1 << (7 - dtm));
+    void ThirdMap::freeByte(QBDI::rword tm) {
+        TM[tm] = 0;
     }
 
     SecondMap::SecondMap() {
@@ -34,18 +34,18 @@
         }
     }
 
-    bool SecondMap::checkByte(QBDI::rword sm, QBDI::rword tm, QBDI::rword dtm) {
-        return SM[sm] == nullptr ? 0 : SM[sm]->checkByte(tm, dtm);
+    size_t SecondMap::checkByte(QBDI::rword sm, QBDI::rword tm) {
+        return SM[sm] == nullptr ? 0 : SM[sm]->checkByte(tm);
     }
 
-    void SecondMap::markByte(QBDI::rword sm, QBDI::rword tm, QBDI::rword dtm) {
+    void SecondMap::markByte(QBDI::rword sm, QBDI::rword tm, size_t mark) {
         if (SM[sm] == nullptr) SM[sm] = new ThirdMap;
-        SM[sm]->markByte(tm, dtm);
+        SM[sm]->markByte(tm, mark);
     }
 
-    void SecondMap::freeByte(QBDI::rword sm, QBDI::rword tm, QBDI::rword dtm) {
+    void SecondMap::freeByte(QBDI::rword sm, QBDI::rword tm) {
         if (SM[sm] == nullptr) return;
-        SM[sm]->freeByte(tm, dtm);
+        SM[sm]->freeByte(tm);
     }
 
     ShadowMemory::ShadowMemory() {
@@ -80,24 +80,23 @@
         }
     }
 
-    bool ShadowMemory::checkByte(QBDI::rword address) {
+    size_t ShadowMemory::checkByte(QBDI::rword address) {
         QBDI::rword pm = (address & ((QBDI::rword)65536 << 32)) >> 32;
         QBDI::rword sm = (address & ((QBDI::rword)65536 << 16)) >> 16;
-        QBDI::rword tm = (address & ((QBDI::rword)8192 << 3)) >> 3;
-        QBDI::rword dtm = address & (QBDI::rword)8;
-        return PM[pm] == nullptr ? 0 : PM[pm]->checkByte(sm, tm, dtm);
+        QBDI::rword tm = address & (QBDI::rword)65536;
+        return PM[pm] == nullptr ? 0 : PM[pm]->checkByte(sm, tm);
     }
 
-    bool ShadowMemory::checkByteRange(QBDI::rword address, QBDI::rword size) {
-        bool res;
+    size_t ShadowMemory::checkByteRange(QBDI::rword address, QBDI::rword size) {
+        size_t res;
         for (int i = 0; i < size; i++) {
             res = checkByte(address + i);
-            if (res) return 1;
+            if (res) return res;
         }
         return 0;
     }
 
-    bool ShadowMemory::checkRegister(int16_t regCtxIdx) {
+    size_t ShadowMemory::checkRegister(int16_t regCtxIdx) {
         switch (regCtxIdx) {
             case 0:
                 return regs.rax;
@@ -163,82 +162,81 @@
         return 0;
     }
 
-    void ShadowMemory::markByte(QBDI::rword address) {
+    void ShadowMemory::taintByte(QBDI::rword address, size_t color) {
         QBDI::rword pm = (address & ((QBDI::rword)65536 << 32)) >> 32;
         QBDI::rword sm = (address & ((QBDI::rword)65536 << 16)) >> 16;
-        QBDI::rword tm = (address & ((QBDI::rword)8192 << 3)) >> 3;
-        QBDI::rword dtm = address & (QBDI::rword)8;
+        QBDI::rword tm = address & (QBDI::rword)65536;
         if (PM[pm] == nullptr) PM[pm] = new SecondMap;
-        PM[pm]->markByte(sm, tm, dtm);
+        PM[pm]->markByte(sm, tm, color);
     }
 
-    void ShadowMemory::markByteRange(QBDI::rword address, QBDI::rword size) {
+    void ShadowMemory::taintByteRange(QBDI::rword address, QBDI::rword size, size_t color) {
         for (int i = 0; i < size; i++) {
-            markByte(address + size);
+            taintByte(address + size, color);
         }
     }
 
-    void ShadowMemory::markRegister(int16_t regCtxIdx) {
+    void ShadowMemory::taintRegister(int16_t regCtxIdx, size_t color) {
         switch (regCtxIdx) {
             case 0:
-                regs.rax = 1;
+                regs.rax = color;
                 break;
             case 1:
-                regs.rbx = 1;
+                regs.rbx = color;
                 break;
             case 2:
-                regs.rcx = 1;
+                regs.rcx = color;
                 break;
             case 3:
-                regs.rdx = 1;
+                regs.rdx = color;
                 break;
             case 4:
-                regs.rsi = 1;
+                regs.rsi = color;
                 break;
             case 5:
-                regs.rdi = 1;
+                regs.rdi = color;
                 break;
             case 6:
-                regs.r8 = 1;
+                regs.r8 = color;
                 break;
             case 7:
-                regs.r9 = 1;
+                regs.r9 = color;
                 break;
             case 8:
-                regs.r10 = 1;
+                regs.r10 = color;
                 break;
             case 9:
-                regs.r11 = 1;
+                regs.r11 = color;
                 break;
             case 10:
-                regs.r12 = 1;
+                regs.r12 = color;
                 break;
             case 11:
-                regs.r13 = 1;
+                regs.r13 = color;
                 break;
             case 12:
-                regs.r14 = 1;
+                regs.r14 = color;
                 break;
             case 13:
-                regs.r15 = 1;
+                regs.r15 = color;
                 break;
             case 14:
-                regs.rbp = 1;
+                regs.rbp = color;
                 break;
             case 15:
-                regs.rsp = 1;
+                regs.rsp = color;
                 break;
             case 16:
-                regs.rip = 1;
+                regs.rip = color;
                 break;
             case 17:
-                regs.eflags = 1;
+                regs.eflags = color;
                 break;
             case 18:
-                regs.fs = 1;
+                regs.fs = color;
                 break;
             case 19:
-                regs.gs = 1;
+                regs.gs = color;
                 break;
         }
     }
@@ -246,10 +244,9 @@
     void ShadowMemory::freeByte(QBDI::rword address) {
         QBDI::rword pm = (address & ((QBDI::rword)65536 << 32)) >> 32;
         QBDI::rword sm = (address & ((QBDI::rword)65536 << 16)) >> 16;
-        QBDI::rword tm = (address & ((QBDI::rword)8192 << 3)) >> 3;
-        QBDI::rword dtm = address & (QBDI::rword)8;
+        QBDI::rword tm = address & (QBDI::rword)65536;
         if (PM[pm] == nullptr) return;
-        PM[pm]->freeByte(sm, tm, dtm);
+        PM[pm]->freeByte(sm, tm);
     }
 
     void ShadowMemory::freeByteRange(QBDI::rword address, QBDI::rword size) {

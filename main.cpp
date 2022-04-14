@@ -46,7 +46,9 @@ QBDI::VMAction taintFromSource(QBDI::VM *vm, QBDI::GPRState *gprState, QBDI::FPR
     const QBDI::InstAnalysis *instAnalysis = vm->getInstAnalysis((QBDI::AnalysisType)7);
 
     if (instAnalysis->isReturn) {
-        sm->markByteRange(gprState->rax, gprState->rdi);
+        for (int i = 0; i < gprState->rdi; i++) {
+            sm->taintByte(gprState->rax + i, i + 1);
+        }
     }
 
     return QBDI::VMAction::CONTINUE;
@@ -57,18 +59,23 @@ QBDI::VMAction taintPropagation(QBDI::VM *vm, QBDI::GPRState *gprState, QBDI::FP
     const QBDI::InstAnalysis *instAnalysis = vm->getInstAnalysis((QBDI::AnalysisType)7);
 
     if (instAnalysis->numOperands == 2) {
-        if (sm->checkRegister(instAnalysis->operands[1].regCtxIdx)) sm->markRegister(instAnalysis->operands[0].regCtxIdx);
-        else sm->freeRegister(instAnalysis->operands[0].regCtxIdx);
+        if (sm->checkRegister(instAnalysis->operands[1].regCtxIdx)) {
+            sm->taintRegister(instAnalysis->operands[0].regCtxIdx, sm->checkRegister(instAnalysis->operands[0].regCtxIdx));
+        } else {
+            sm->freeRegister(instAnalysis->operands[0].regCtxIdx);
+        }
     } else if (instAnalysis->numOperands == 6) {
         if (instAnalysis->operands[1].type == QBDI::OPERAND_GPR) {
             if (sm->checkByteRange(instAnalysis->operands[4].value, instAnalysis->operands[0].size)) {
-                sm->markRegister(instAnalysis->operands[0].regCtxIdx);
+                sm->taintRegister(instAnalysis->operands[0].regCtxIdx, 
+                                    sm->checkByteRange(instAnalysis->operands[4].value, instAnalysis->operands[0].size));
             } else {
                 sm->freeRegister(instAnalysis->operands[0].regCtxIdx);
             }
         } else {
             if (sm->checkRegister(instAnalysis->operands[5].regCtxIdx)) {
-                sm->markByteRange(instAnalysis->operands[3].value, instAnalysis->operands[5].size);
+                sm->taintByteRange(instAnalysis->operands[3].value, instAnalysis->operands[5].size, 
+                                    sm->checkRegister(instAnalysis->operands[5].regCtxIdx));
             } else {
                 sm->freeByteRange(instAnalysis->operands[3].value, instAnalysis->operands[5].size);
             }
