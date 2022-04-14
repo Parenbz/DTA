@@ -4,6 +4,7 @@
 #include <iomanip>
 
 #include "QBDI.h"
+#include "ShadowMemory.h"
 
 uint8_t *source(int n) {
     return (uint8_t *)malloc(n);
@@ -33,10 +34,6 @@ QBDI::VMAction showInstruction(QBDI::VM *vm, QBDI::GPRState *gprState, QBDI::FPR
 
     std::cout << std::setbase(16) << instAnalysis->address << ": "
                 << instAnalysis->disassembly << std::endl << std::setbase(10);
-    
-    if (instAnalysis->isCall) {
-        std::cout << std::setbase(16) << instAnalysis->operands[0].value + instAnalysis->address << std::endl << std::setbase(10);
-    }
 
     return QBDI::VMAction::CONTINUE;
 }
@@ -54,7 +51,7 @@ int main(int argc, char **argv) {
     QBDI::VM *vm = new QBDI::VM;
     state = vm->getGPRState();
     QBDI::allocateVirtualStack(state, STACK_SIZE, &fakestack);
-    vm->addCodeCB(QBDI::PREINST, showInstruction, nullptr);
+    vm->addCodeCB(QBDI::POSTINST, showInstruction, nullptr);
     vm->addInstrumentedModuleFromAddr((QBDI::rword)func);
     vm->call(nullptr, (QBDI::rword)func, {(QBDI::rword)n});
     QBDI::alignedFree(fakestack);
