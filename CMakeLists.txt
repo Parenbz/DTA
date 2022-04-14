@@ -1,4 +1,4 @@
-project(test)
+project(DTA)
 
 add_executable(main main.cpp ShadowMemory.h ShadowMemory.cpp)
 

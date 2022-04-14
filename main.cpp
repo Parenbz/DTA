@@ -41,6 +41,7 @@ QBDI::VMAction showInstruction(QBDI::VM *vm, QBDI::GPRState *gprState, QBDI::FPR
     return QBDI::VMAction::CONTINUE;
 }
 
+//Помечаем данные, выделенные в source
 QBDI::VMAction taintFromSource(QBDI::VM *vm, QBDI::GPRState *gprState, QBDI::FPRState *fprState, void *data) {
     const QBDI::InstAnalysis *instAnalysis = vm->getInstAnalysis((QBDI::AnalysisType)7);
 
@@ -51,6 +52,7 @@ QBDI::VMAction taintFromSource(QBDI::VM *vm, QBDI::GPRState *gprState, QBDI::FPR
     return QBDI::VMAction::CONTINUE;
 }
 
+//Обновление Shadow Memory с каждой командой mov
 QBDI::VMAction taintPropagation(QBDI::VM *vm, QBDI::GPRState *gprState, QBDI::FPRState *fprState, void *data) {
     const QBDI::InstAnalysis *instAnalysis = vm->getInstAnalysis((QBDI::AnalysisType)7);
 
