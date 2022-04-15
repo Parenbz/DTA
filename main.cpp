@@ -28,12 +28,7 @@ void func(size_t n) {
     uint8_t *tstr = source(n);
     uint8_t *str = (uint8_t *)malloc(n);
 
-    for (size_t i = 0; i < n; i++) {
-        if (rand() % 2) {
-            std::cout << "Should catch byte with offset " << i << std::endl;
-            str[i] = tstr[i];
-        }
-    }
+    str[n - 1] = tstr[n - 1];
 
     sink(str, n);
 
