@@ -111,7 +111,7 @@ void ShadowMemory::freeByte(QBDI::rword address) {
 
 void ShadowMemory::freeByteRange(QBDI::rword address, QBDI::rword size) {
     for (int i = 0; i < size; i++) {
-        freeByte(address + size);
+        freeByte(address + i);
     }
 }
 

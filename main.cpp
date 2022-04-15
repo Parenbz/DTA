@@ -29,8 +29,14 @@ void func(size_t n) {
 
     for (int i = 0; i < n; i++) {
         if (rand() % 2) {
-            std::cout << "Should catch byte with offset " << i << std::endl;
-            str[i] = tstr[i];
+            uint8_t x = tstr[i];
+            if (rand() % 2) {
+                std::cout << "Should catch byte with offset " << i << std::endl;
+                str[i] = x;
+            } else {
+                x = rand() % 100;
+                str[i] = x;
+            }
         }
     }
 
@@ -85,25 +91,38 @@ QBDI::VMAction taintPropagation(QBDI::VM *vm, QBDI::GPRState *gprState, QBDI::FP
         //mov регистр, адрес
         if (instAnalysis->operands[1].type == QBDI::OPERAND_GPR) {
             size_t address = *(&(gprState->rax) + instAnalysis->operands[1].regCtxIdx) + instAnalysis->operands[4].value;
-            if (sm->checkByteRange(address, instAnalysis->operands[0].size)) {
-                sm->taintRegister(instAnalysis->operands[0].regCtxIdx, sm->checkByteRange(address, instAnalysis->operands[0].size));
+            if (sm->checkByteRange(address, instAnalysis->loadSize)) {
+                sm->taintRegister(instAnalysis->operands[0].regCtxIdx, sm->checkByteRange(address, instAnalysis->loadSize));
             } else {
                 sm->freeRegister(instAnalysis->operands[0].regCtxIdx);
             }
 
         //mov адрес, регистр
-        } else {
+        } else if (instAnalysis->operands[5].type == QBDI::OPERAND_GPR){
             size_t address = *(&(gprState->rax) + instAnalysis->operands[0].regCtxIdx) + instAnalysis->operands[3].value;
             if (sm->checkRegister(instAnalysis->operands[5].regCtxIdx)) {
-                sm->taintByteRange(address, instAnalysis->operands[5].size, sm->checkRegister(instAnalysis->operands[5].regCtxIdx));
+                sm->taintByteRange(address, instAnalysis->storeSize, sm->checkRegister(instAnalysis->operands[5].regCtxIdx));
             } else {
-                sm->freeByteRange(address, instAnalysis->operands[5].size);
+                sm->freeByteRange(address, instAnalysis->storeSize);
             }
+
+        //mov адрес, константа
+        } else {
+            size_t address = *(&(gprState->rax) + instAnalysis->operands[0].regCtxIdx) + instAnalysis->operands[3].value;
+            sm->freeByteRange(address, instAnalysis->storeSize);
         }
     }
 
     return QBDI::VMAction::CONTINUE;
 }
+
+// QBDI::VMAction sI(QBDI::VM *vm, QBDI::GPRState *gprState, QBDI::FPRState *fprState, void *data) {
+//     const QBDI::InstAnalysis *iA = vm->getInstAnalysis();
+
+//     std::cout << std::setbase(16) << iA->address << std::setbase(10) << ": " << iA->disassembly << std::endl;
+
+//     return QBDI::VMAction::CONTINUE;
+// }
 
 const static size_t STACK_SIZE = 0x100000;
 
@@ -120,6 +139,7 @@ int main(int argc, char **argv) {
     QBDI::VM *vm = new QBDI::VM;
     state = vm->getGPRState();
     QBDI::allocateVirtualStack(state, STACK_SIZE, &fakestack);
+    // vm->addCodeCB(QBDI::PREINST, sI, nullptr);
     vm->addMnemonicCB("mov*", QBDI::PREINST, taintPropagation, nullptr);
     vm->addCodeAddrCB((QBDI::rword)source, QBDI::PREINST, getSourceSize, sourceSize);
     vm->addCodeRangeCB((QBDI::rword)source, (QBDI::rword)sink, QBDI::PREINST, taintSource, sourceSize);
