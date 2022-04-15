@@ -28,11 +28,22 @@ void func(size_t n) {
     uint8_t *tstr = source(n);
     uint8_t *str = (uint8_t *)malloc(n);
 
-    str[n - 1] = tstr[n - 1];
+    for (int i = 0; i < n; i++) {
+        if (rand() % 2) {
+            std::cout << "Should catch byte with offset " << i << std::endl;
+            str[i] = tstr[i];
+        }
+    }
 
     sink(str, n);
 
     free(tstr);
+}
+
+QBDI::VMAction getSourceSize(QBDI::VM *vm, QBDI::GPRState *gprState, QBDI::FPRState *fprState, void *data) {
+    *(size_t *)data = gprState->rdi;
+
+    return QBDI::VMAction::CONTINUE;
 }
 
 //Помечаем данные, выделенные в source
@@ -40,8 +51,10 @@ QBDI::VMAction taintSource(QBDI::VM *vm, QBDI::GPRState *gprState, QBDI::FPRStat
     const QBDI::InstAnalysis *instAnalysis = vm->getInstAnalysis((QBDI::AnalysisType)7);
 
     if (instAnalysis->isReturn) {
-        for (int i = 0; i < gprState->rdi; i++) {
-            sm->taintByte(gprState->rax + i, i + 1);
+        size_t size = *(size_t *)data;
+        size_t address = gprState->rax;
+        for (int i = 0; i < size; i++) {
+            sm->taintByte(address + i, i + 1);
         }
     }
 
@@ -79,6 +92,15 @@ QBDI::VMAction taintPropagation(QBDI::VM *vm, QBDI::GPRState *gprState, QBDI::FP
     return QBDI::VMAction::CONTINUE;
 }
 
+// QBDI::VMAction showInstruction(QBDI::VM *vm, QBDI::GPRState *gprState, QBDI::FPRState *fprState, void *data) {
+//     const QBDI::InstAnalysis *instAnalysis = vm->getInstAnalysis((QBDI::AnalysisType)7);
+
+//     std::cout << std::setbase(16) << instAnalysis->address << ": "
+//                 << instAnalysis->disassembly << std::endl << std::setbase(10);
+
+//     return QBDI::VMAction::CONTINUE;
+// }
+
 const static size_t STACK_SIZE = 0x100000;
 
 int main(int argc, char **argv) {
@@ -89,13 +111,18 @@ int main(int argc, char **argv) {
     uint8_t *fakestack;
     QBDI::GPRState *state;
 
+    size_t *size = new size_t;
+
     QBDI::VM *vm = new QBDI::VM;
     state = vm->getGPRState();
     QBDI::allocateVirtualStack(state, STACK_SIZE, &fakestack);
     vm->addMnemonicCB("mov*", QBDI::PREINST, taintPropagation, nullptr);
-    vm->addCodeRangeCB((QBDI::rword)source, (QBDI::rword)sink, QBDI::PREINST, taintSource, nullptr);
+    vm->addCodeAddrCB((QBDI::rword)source, QBDI::PREINST, getSourceSize, size);
+    // vm->addCodeCB(QBDI::PREINST, showInstruction, nullptr);
+    vm->addCodeRangeCB((QBDI::rword)source, (QBDI::rword)sink, QBDI::PREINST, taintSource, size);
     vm->addInstrumentedModuleFromAddr((QBDI::rword)func);
     vm->call(nullptr, (QBDI::rword)func, {(QBDI::rword)n});
     QBDI::alignedFree(fakestack);
     delete sm;
+    delete size;
 }
