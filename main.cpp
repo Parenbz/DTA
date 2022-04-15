@@ -15,6 +15,12 @@ uint8_t *source(int n) {
 
 //s подаётся через rdi, n через rsi
 void sink(uint8_t *s, size_t n) {
+    for (int i = 0; i < n; i++) {
+        if (sm->checkByte((size_t)s + i)) {
+            std::cout << "Caught byte " << std::setbase(16) << (size_t)s + i << std::setbase(10) 
+                        << " with offset " << sm->checkByte((size_t)s + i) - 1 << std::endl;
+        }
+    }
     free(s);
 }
 
@@ -78,20 +84,6 @@ QBDI::VMAction taintPropagation(QBDI::VM *vm, QBDI::GPRState *gprState, QBDI::FP
     return QBDI::VMAction::CONTINUE;
 }
 
-QBDI::VMAction taintSink(QBDI::VM *vm, QBDI::GPRState *gprState, QBDI::FPRState *fprState, void *data) {
-    QBDI::rword address = gprState->rdi;
-    size_t size = gprState->rsi;
-
-    for (size_t i = 0; i < size; i++) {
-        if (sm->checkByte(address + i)) {
-            std::cout << "Caught byte " << std::setbase(16) << address + i << std::setbase(10) 
-                        << " with offset " << sm->checkByte(address + i) - 1 << std::endl;
-        }
-    }
-
-    return QBDI::VMAction::CONTINUE;
-}
-
 const static size_t STACK_SIZE = 0x100000;
 
 int main(int argc, char **argv) {
@@ -107,7 +99,6 @@ int main(int argc, char **argv) {
     QBDI::allocateVirtualStack(state, STACK_SIZE, &fakestack);
     vm->addMnemonicCB("mov*", QBDI::PREINST, taintPropagation, nullptr);
     vm->addCodeRangeCB((QBDI::rword)source, (QBDI::rword)sink, QBDI::PREINST, taintSource, nullptr);
-    vm->addCodeAddrCB((QBDI::rword)sink, QBDI::PREINST, taintSink, nullptr);
     vm->addInstrumentedModuleFromAddr((QBDI::rword)func);
     vm->call(nullptr, (QBDI::rword)func, {(QBDI::rword)n});
     QBDI::alignedFree(fakestack);
