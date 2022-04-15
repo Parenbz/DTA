@@ -110,7 +110,7 @@ const static size_t STACK_SIZE = 0x100000;
 int main(int argc, char **argv) {
     srand(time(0));
 
-    size_t n = atoi(argv[1]);
+    size_t n = argc > 1 ? atoi(argv[1]) : 1;
 
     uint8_t *fakestack;
     QBDI::GPRState *state;
