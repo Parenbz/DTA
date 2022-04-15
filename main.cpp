@@ -13,7 +13,6 @@ uint8_t *source(int n) {
     return (uint8_t *)malloc(n);
 }
 
-//s подаётся через rdi, n через rsi
 void sink(uint8_t *s, size_t n) {
     for (int i = 0; i < n; i++) {
         if (sm->checkByte((size_t)s + i)) {
@@ -40,13 +39,14 @@ void func(size_t n) {
     free(tstr);
 }
 
+//Получить размер массива, выделенного в source
 QBDI::VMAction getSourceSize(QBDI::VM *vm, QBDI::GPRState *gprState, QBDI::FPRState *fprState, void *data) {
     *(size_t *)data = gprState->rdi;
 
     return QBDI::VMAction::CONTINUE;
 }
 
-//Помечаем данные, выделенные в source
+//Пометить данные, выделенные в source
 QBDI::VMAction taintSource(QBDI::VM *vm, QBDI::GPRState *gprState, QBDI::FPRState *fprState, void *data) {
     const QBDI::InstAnalysis *instAnalysis = vm->getInstAnalysis((QBDI::AnalysisType)7);
 
@@ -66,40 +66,44 @@ QBDI::VMAction taintPropagation(QBDI::VM *vm, QBDI::GPRState *gprState, QBDI::FP
     const QBDI::InstAnalysis *instAnalysis = vm->getInstAnalysis((QBDI::AnalysisType)7);
 
     if (instAnalysis->numOperands == 2) {
-        if (sm->checkRegister(instAnalysis->operands[1].regCtxIdx)) {
-            sm->taintRegister(instAnalysis->operands[0].regCtxIdx, sm->checkRegister(instAnalysis->operands[0].regCtxIdx));
-        } else {
-            sm->freeRegister(instAnalysis->operands[0].regCtxIdx);
-        }
-    } else if (instAnalysis->numOperands == 6) {
+        
+        //mov регистр, регистр
         if (instAnalysis->operands[1].type == QBDI::OPERAND_GPR) {
-            if (sm->checkByteRange(*(&(gprState->rax) + instAnalysis->operands[1].regCtxIdx) + instAnalysis->operands[4].value, instAnalysis->operands[0].size)) {
-                sm->taintRegister(instAnalysis->operands[0].regCtxIdx, 
-                                    sm->checkByteRange(*(&(gprState->rax) + instAnalysis->operands[1].regCtxIdx) + instAnalysis->operands[4].value, instAnalysis->operands[0].size));
+            if (sm->checkRegister(instAnalysis->operands[1].regCtxIdx)) {
+                sm->taintRegister(instAnalysis->operands[0].regCtxIdx, sm->checkRegister(instAnalysis->operands[0].regCtxIdx));
             } else {
                 sm->freeRegister(instAnalysis->operands[0].regCtxIdx);
             }
+
+        //mov регистр, константа
         } else {
-            if (sm->checkRegister(instAnalysis->operands[5].regCtxIdx)) {
-                sm->taintByteRange(*(&(gprState->rax) + instAnalysis->operands[0].regCtxIdx) + instAnalysis->operands[3].value, instAnalysis->operands[5].size, 
-                                    sm->checkRegister(instAnalysis->operands[5].regCtxIdx));
+            sm->freeRegister(instAnalysis->operands[0].regCtxIdx);
+        }
+        
+    } else if (instAnalysis->numOperands == 6) {
+
+        //mov регистр, адрес
+        if (instAnalysis->operands[1].type == QBDI::OPERAND_GPR) {
+            size_t address = *(&(gprState->rax) + instAnalysis->operands[1].regCtxIdx) + instAnalysis->operands[4].value;
+            if (sm->checkByteRange(address, instAnalysis->operands[0].size)) {
+                sm->taintRegister(instAnalysis->operands[0].regCtxIdx, sm->checkByteRange(address, instAnalysis->operands[0].size));
             } else {
-                sm->freeByteRange(*(&(gprState->rax) + instAnalysis->operands[0].regCtxIdx) + instAnalysis->operands[3].value, instAnalysis->operands[5].size);
+                sm->freeRegister(instAnalysis->operands[0].regCtxIdx);
+            }
+
+        //mov адрес, регистр
+        } else {
+            size_t address = *(&(gprState->rax) + instAnalysis->operands[0].regCtxIdx) + instAnalysis->operands[3].value;
+            if (sm->checkRegister(instAnalysis->operands[5].regCtxIdx)) {
+                sm->taintByteRange(address, instAnalysis->operands[5].size, sm->checkRegister(instAnalysis->operands[5].regCtxIdx));
+            } else {
+                sm->freeByteRange(address, instAnalysis->operands[5].size);
             }
         }
     }
 
     return QBDI::VMAction::CONTINUE;
 }
-
-// QBDI::VMAction showInstruction(QBDI::VM *vm, QBDI::GPRState *gprState, QBDI::FPRState *fprState, void *data) {
-//     const QBDI::InstAnalysis *instAnalysis = vm->getInstAnalysis((QBDI::AnalysisType)7);
-
-//     std::cout << std::setbase(16) << instAnalysis->address << ": "
-//                 << instAnalysis->disassembly << std::endl << std::setbase(10);
-
-//     return QBDI::VMAction::CONTINUE;
-// }
 
 const static size_t STACK_SIZE = 0x100000;
 
@@ -111,18 +115,17 @@ int main(int argc, char **argv) {
     uint8_t *fakestack;
     QBDI::GPRState *state;
 
-    size_t *size = new size_t;
+    size_t *sourceSize = new size_t;
 
     QBDI::VM *vm = new QBDI::VM;
     state = vm->getGPRState();
     QBDI::allocateVirtualStack(state, STACK_SIZE, &fakestack);
     vm->addMnemonicCB("mov*", QBDI::PREINST, taintPropagation, nullptr);
-    vm->addCodeAddrCB((QBDI::rword)source, QBDI::PREINST, getSourceSize, size);
-    // vm->addCodeCB(QBDI::PREINST, showInstruction, nullptr);
-    vm->addCodeRangeCB((QBDI::rword)source, (QBDI::rword)sink, QBDI::PREINST, taintSource, size);
+    vm->addCodeAddrCB((QBDI::rword)source, QBDI::PREINST, getSourceSize, sourceSize);
+    vm->addCodeRangeCB((QBDI::rword)source, (QBDI::rword)sink, QBDI::PREINST, taintSource, sourceSize);
     vm->addInstrumentedModuleFromAddr((QBDI::rword)func);
     vm->call(nullptr, (QBDI::rword)func, {(QBDI::rword)n});
     QBDI::alignedFree(fakestack);
     delete sm;
-    delete size;
+    delete sourceSize;
 }
