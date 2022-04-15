@@ -116,14 +116,6 @@ QBDI::VMAction taintPropagation(QBDI::VM *vm, QBDI::GPRState *gprState, QBDI::FP
     return QBDI::VMAction::CONTINUE;
 }
 
-// QBDI::VMAction sI(QBDI::VM *vm, QBDI::GPRState *gprState, QBDI::FPRState *fprState, void *data) {
-//     const QBDI::InstAnalysis *iA = vm->getInstAnalysis();
-
-//     std::cout << std::setbase(16) << iA->address << std::setbase(10) << ": " << iA->disassembly << std::endl;
-
-//     return QBDI::VMAction::CONTINUE;
-// }
-
 const static size_t STACK_SIZE = 0x100000;
 
 int main(int argc, char **argv) {
@@ -139,7 +131,6 @@ int main(int argc, char **argv) {
     QBDI::VM *vm = new QBDI::VM;
     state = vm->getGPRState();
     QBDI::allocateVirtualStack(state, STACK_SIZE, &fakestack);
-    // vm->addCodeCB(QBDI::PREINST, sI, nullptr);
     vm->addMnemonicCB("mov*", QBDI::PREINST, taintPropagation, nullptr);
     vm->addCodeAddrCB((QBDI::rword)source, QBDI::PREINST, getSourceSize, sourceSize);
     vm->addCodeRangeCB((QBDI::rword)source, (QBDI::rword)sink, QBDI::PREINST, taintSource, sourceSize);
