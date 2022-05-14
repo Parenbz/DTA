@@ -1,51 +1,39 @@
 #ifndef SHADOW_MEMORY_H
 #define SHADOW_MEMORY_H
 #include "QBDI.h"
+#include <set>
 
-class ThirdMap {
-private:
-    size_t TM[65536];
-
+class line {
 public:
-    ThirdMap();
-    ~ThirdMap();
+    size_t l, r, color;
 
-    size_t checkByte(QBDI::rword tm);
-    void markByte(QBDI::rword tm, size_t mark);
-    void freeByte(QBDI::rword tm);
+    line(size_t L, size_t R, size_t COLOR)
+        : l(L), r(R), color(COLOR)
+    {}
 };
 
-class SecondMap {
-private:
-    ThirdMap* SM[65536];
-
-public:
-    SecondMap();
-    ~SecondMap();
-
-    size_t checkByte(QBDI::rword sm, QBDI::rword tm);
-    void markByte(QBDI::rword sm, QBDI::rword tm, size_t mark);
-    void freeByte(QBDI::rword sm, QBDI::rword tm);
+struct cmp {
+    bool operator() (const line &l1, const line &l2) {
+        return l1.l < l2.l;
+    }
 };
 
 class ShadowMemory {
 private:
-    SecondMap* PM[65536];
-    QBDI::GPRState regs;
+
+    std::set<line, cmp> regs, memory;
 
 public:
-    ShadowMemory();
-    ~ShadowMemory();
 
-    size_t checkByte(QBDI::rword address);
-    size_t checkByteRange(QBDI::rword address, QBDI::rword size);
-    size_t checkRegister(int16_t regCtxIdx);
-    void taintByte(QBDI::rword address, size_t color);
-    void taintByteRange(QBDI::rword address, QBDI::rword size, size_t color);
-    void taintRegister(int16_t regCtxIdx, size_t color);
-    void freeByte(QBDI::rword address);
-    void freeByteRange(QBDI::rword address, QBDI::rword size);
-    void freeRegister(int16_t regCtxIdx);
+    size_t checkByte(const size_t &address);
+    size_t checkByteRange(const size_t &address, const size_t &size);
+    size_t checkRegister(const size_t &regaddress, const size_t &size);
+    void taintByte(const size_t &address, const size_t &color);
+    void taintByteRange(const size_t &address, const size_t &size, const size_t &color);
+    void taintRegister(const size_t &regaddress, const size_t &size, const size_t &color);
+    void freeByte(const size_t &address);
+    void freeByteRange(const size_t &address, const size_t &size);
+    void freeRegister(const size_t &regaddress, const size_t &size);
 };
 
 #endif
